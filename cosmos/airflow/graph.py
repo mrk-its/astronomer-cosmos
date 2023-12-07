@@ -176,19 +176,22 @@ def generate_task_or_group(
     # If test_behaviour=="after_each", each model task will be bundled with a test task, using TaskGroup
     if task_meta and node.resource_type != DbtResourceType.TEST:
         if use_task_group:
-            with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                # task = create_airflow_task(task_meta, dag, task_group=model_task_group)
-                test_meta = create_test_task_metadata(
-                    "test",
-                    execution_mode,
-                    test_indirect_selection,
-                    task_args=task_args,
-                    node=node,
-                    on_warning_callback=on_warning_callback,
-                )
-                test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
-                # task >> test_task
-                task_or_group = model_task_group
+            test_meta = create_test_task_metadata(
+                "test",
+                execution_mode,
+                test_indirect_selection,
+                task_args=task_args,
+                node=node,
+                on_warning_callback=on_warning_callback,
+            )
+            if node.config.get('materialized') == 'ephemeral':
+                task_or_group = create_airflow_task(test_meta, dag, task_group=task_group)
+            else:
+                with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
+                    task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                    test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
+                    task >> test_task
+                    task_or_group = model_task_group
         else:
             task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
     return task_or_group
