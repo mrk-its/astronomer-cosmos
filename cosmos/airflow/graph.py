@@ -278,7 +278,7 @@ def build_airflow_graph(
 
 
 def is_ephemeral(node):
-    return node.config.get('materialized') == 'ephemeral'
+    return node.config.get('materialized') == 'ephemeral' and not node.has_test
 
 
 def non_ephemeral_deps(nodes, node):
