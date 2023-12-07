@@ -177,7 +177,7 @@ def generate_task_or_group(
     if task_meta and node.resource_type != DbtResourceType.TEST:
         if use_task_group:
             with TaskGroup(dag=dag, group_id=node.name, parent_group=task_group) as model_task_group:
-                task = create_airflow_task(task_meta, dag, task_group=model_task_group)
+                # task = create_airflow_task(task_meta, dag, task_group=model_task_group)
                 test_meta = create_test_task_metadata(
                     "test",
                     execution_mode,
@@ -187,7 +187,7 @@ def generate_task_or_group(
                     on_warning_callback=on_warning_callback,
                 )
                 test_task = create_airflow_task(test_meta, dag, task_group=model_task_group)
-                task >> test_task
+                # task >> test_task
                 task_or_group = model_task_group
         else:
             task_or_group = create_airflow_task(task_meta, dag, task_group=task_group)
