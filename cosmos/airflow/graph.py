@@ -177,7 +177,7 @@ def generate_task_or_group(
     if task_meta and node.resource_type != DbtResourceType.TEST:
         if use_task_group:
             test_meta = create_test_task_metadata(
-                "test",
+                f"{node.name}_test",
                 execution_mode,
                 test_indirect_selection,
                 task_args=task_args,
