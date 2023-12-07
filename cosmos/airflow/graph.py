@@ -235,6 +235,8 @@ def build_airflow_graph(
     task_or_group: TaskGroup | BaseOperator
 
     for node_id, node in nodes.items():
+        if is_ephemeral(node):
+            continue
         conversion_function = node_converters.get(node.resource_type, generate_task_or_group)
         if conversion_function != generate_task_or_group:
             logger.warning(
@@ -275,6 +277,20 @@ def build_airflow_graph(
     create_airflow_task_dependencies(nodes, tasks_map)
 
 
+def is_ephemeral(node):
+    return node.config.get('materialized') == 'ephemeral'
+
+
+def non_ephemeral_deps(nodes, node):
+    for parent_node_id in node.depends_on:
+        parent_node = nodes[parent_node_id]
+        if is_ephemeral(parent_node):
+            for parent_node_id in non_ephemeral_deps(nodes, parent_node):
+                yield parent_node_id                
+        else:
+            yield parent_node_id
+
+
 def create_airflow_task_dependencies(
     nodes: dict[str, DbtNode], tasks_map: dict[str, Union[TaskGroup, BaseOperator]]
 ) -> None:
@@ -284,7 +300,7 @@ def create_airflow_task_dependencies(
     :param tasks_map: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     for node_id, node in nodes.items():
-        for parent_node_id in node.depends_on:
+        for parent_node_id in non_ephemeral_deps(nodes, node):
             # depending on the node type, it will not have mapped 1:1 to tasks_map
             if (node_id in tasks_map) and (parent_node_id in tasks_map):
                 tasks_map[parent_node_id] >> tasks_map[node_id]
