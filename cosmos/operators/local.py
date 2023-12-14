@@ -21,8 +21,30 @@ from airflow.utils.context import Context
 from airflow.utils.session import NEW_SESSION, create_session, provide_session
 
 try:
-    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor as OrigDbtLocalArtifactProcessor
     from airflow.datasets import Dataset
+
+    class DbtLocalArtifactProcessor(OrigDbtLocalArtifactProcessor):
+        def parse_execution(self, context, nodes):
+
+            def non_ephemeral_parents(node):
+                for parent in context.manifest["parent_map"][node]:
+                    if parent.startswith("source.") or nodes[parent]["config"]["materialized"] != "ephemeral":
+                        yield parent
+                    else:
+                        for parent in non_ephemeral_parents(parent):
+                            yield parent
+
+            for run in context.run_results["results"]:
+                name = run["unique_id"]
+                if not any(name.startswith(prefix) for prefix in ("model.", "source.", "snapshot.")):
+                    continue
+                if run["status"] == "skipped":
+                    continue
+                context.manifest["parent_map"][run["unique_id"]] = list(non_ephemeral_parents(run["unique_id"]))
+
+            return super().parse_execution(context, nodes)
+
 except ModuleNotFoundError:
     is_openlineage_available = False
     DbtLocalArtifactProcessor = None
